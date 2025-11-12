@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MetaMask Connection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #4F46E5;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #4338CA;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+        }
+        .error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+        }
+        .success {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #16a34a;
+        }
+        .info {
+            font-size: 14px;
+            color: #666;
+            margin-top: 10px;
+        }
+        pre {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🦊 MetaMask Connection Test</h1>
+        <p class="info">Use this page to test if MetaMask is working properly before testing the main app.</p>
+        
+        <div id="status" class="status">
+            <strong>Status:</strong> Checking MetaMask...
+        </div>
+
+        <div>
+            <button id="checkBtn" onclick="checkMetaMask()">1. Check MetaMask</button>
+            <button id="connectBtn" onclick="connectWallet()" disabled>2. Connect Wallet</button>
+            <button id="getAccountBtn" onclick="getAccount()" disabled>3. Get Account</button>
+            <button id="getBalanceBtn" onclick="getBalance()" disabled>4. Get Balance</button>
+        </div>
+
+        <div id="result" style="margin-top: 20px;"></div>
+
+        <div style="margin-top: 30px;">
+            <h3>Console Logs:</h3>
+            <pre id="logs">Ready to test...</pre>
+        </div>
+
+        <div class="info" style="margin-top: 30px;">
+            <strong>What should happen:</strong>
+            <ol>
+                <li>Click "Check MetaMask" - should detect MetaMask installation</li>
+                <li>Click "Connect Wallet" - MetaMask popup should appear</li>
+                <li>Approve connection in MetaMask</li>
+                <li>Click "Get Account" - should show your wallet address</li>
+                <li>Click "Get Balance" - should show your MATIC balance</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        let logs = [];
+        
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            logs.push(`[${timestamp}] ${type.toUpperCase()}: ${message}`);
+            document.getElementById('logs').textContent = logs.join('\n');
+            console.log(`[${type}]`, message);
+        }
+
+        function setStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = `<strong>Status:</strong> ${message}`;
+            statusDiv.className = `status ${type}`;
+        }
+
+        function setResult(html) {
+            document.getElementById('result').innerHTML = html;
+        }
+
+        async function checkMetaMask() {
+            addLog('Checking for MetaMask...');
+            
+            if (typeof window.ethereum === 'undefined') {
+                setStatus('❌ MetaMask NOT installed', 'error');
+                setResult(`
+                    <div class="error">
+                        <strong>MetaMask not found!</strong><br>
+                        Please install MetaMask from: <a href="https://metamask.io/download/" target="_blank">https://metamask.io/download/</a>
+                    </div>
+                `);
+                addLog('MetaMask not installed', 'error');
+            } else {
+                setStatus('✅ MetaMask is installed', 'success');
+                setResult(`
+                    <div class="success">
+                        <strong>MetaMask detected!</strong><br>
+                        Version: ${window.ethereum.isMetaMask ? 'MetaMask' : 'Unknown'}<br>
+                        Ready to connect.
+                    </div>
+                `);
+                addLog('MetaMask found!', 'success');
+                document.getElementById('connectBtn').disabled = false;
+                
+                // Check if already connected
+                try {
+                    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                    if (accounts.length > 0) {
+                        addLog(`Already connected: ${accounts[0]}`, 'success');
+                        setStatus(`✅ Already connected: ${accounts[0].slice(0, 6)}...${accounts[0].slice(-4)}`, 'success');
+                        document.getElementById('getAccountBtn').disabled = false;
+                        document.getElementById('getBalanceBtn').disabled = false;
+                    }
+                } catch (err) {
+                    addLog(`Error checking accounts: ${err.message}`, 'error');
+                }
+            }
+        }
+
+        async function connectWallet() {
+            addLog('Requesting wallet connection...');
+            setStatus('🔄 Requesting connection...', 'info');
+            
+            try {
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                
+                if (accounts.length === 0) {
+                    throw new Error('No accounts returned');
+                }
+                
+                const account = accounts[0];
+                addLog(`Connected: ${account}`, 'success');
+                setStatus(`✅ Connected: ${account.slice(0, 6)}...${account.slice(-4)}`, 'success');
+                
+                setResult(`
+                    <div class="success">
+                        <strong>Connection successful!</strong><br>
+                        Address: <code>${account}</code>
+                    </div>
+                `);
+                
+                document.getElementById('getAccountBtn').disabled = false;
+                document.getElementById('getBalanceBtn').disabled = false;
+                
+            } catch (error) {
+                addLog(`Connection failed: ${error.message}`, 'error');
+                setStatus('❌ Connection failed', 'error');
+                
+                let errorMsg = error.message;
+                if (error.code === 4001) {
+                    errorMsg = 'User rejected the connection request';
+                }
+                
+                setResult(`
+                    <div class="error">
+                        <strong>Connection failed!</strong><br>
+                        Error: ${errorMsg}
+                    </div>
+                `);
+            }
+        }
+
+        async function getAccount() {
+            addLog('Getting account...');
+            
+            try {
+                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                
+                if (accounts.length === 0) {
+                    throw new Error('No accounts found. Please connect first.');
+                }
+                
+                const account = accounts[0];
+                addLog(`Account: ${account}`, 'success');
+                
+                setResult(`
+                    <div class="success">
+                        <strong>Current Account:</strong><br>
+                        <code>${account}</code>
+                    </div>
+                `);
+                
+            } catch (error) {
+                addLog(`Error getting account: ${error.message}`, 'error');
+                setResult(`
+                    <div class="error">
+                        <strong>Error:</strong> ${error.message}
+                    </div>
+                `);
+            }
+        }
+
+        async function getBalance() {
+            addLog('Getting balance...');
+            
+            try {
+                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                
+                if (accounts.length === 0) {
+                    throw new Error('No accounts found. Please connect first.');
+                }
+                
+                const account = accounts[0];
+                const balance = await window.ethereum.request({
+                    method: 'eth_getBalance',
+                    params: [account, 'latest']
+                });
+                
+                // Convert from Wei to Ether (or MATIC)
+                const balanceInEther = parseInt(balance, 16) / 1e18;
+                
+                addLog(`Balance: ${balanceInEther.toFixed(4)} MATIC`, 'success');
+                
+                setResult(`
+                    <div class="success">
+                        <strong>Wallet Balance:</strong><br>
+                        ${balanceInEther.toFixed(4)} MATIC<br>
+                        <small>(${balance} Wei)</small>
+                    </div>
+                `);
+                
+            } catch (error) {
+                addLog(`Error getting balance: ${error.message}`, 'error');
+                setResult(`
+                    <div class="error">
+                        <strong>Error:</strong> ${error.message}
+                    </div>
+                `);
+            }
+        }
+
+        // Auto-check on load
+        window.addEventListener('load', () => {
+            addLog('Page loaded, initializing...');
+            setTimeout(checkMetaMask, 500);
+        });
+
+        // Listen for account changes
+        if (typeof window.ethereum !== 'undefined') {
+            window.ethereum.on('accountsChanged', (accounts) => {
+                addLog(`Account changed: ${accounts[0] || 'disconnected'}`, 'info');
+                if (accounts.length === 0) {
+                    setStatus('⚠️ Wallet disconnected', 'error');
+                    document.getElementById('getAccountBtn').disabled = true;
+                    document.getElementById('getBalanceBtn').disabled = true;
+                }
+            });
+        }
+    </script>
+</body>
+</html>

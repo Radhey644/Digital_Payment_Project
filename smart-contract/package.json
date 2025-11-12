@@ -1,0 +1,31 @@
+{
+  "name": "ticketnft-smart-contract",
+  "version": "1.0.0",
+  "description": "NFT Ticketing System Smart Contract",
+  "main": "hardhat.config.js",
+  "scripts": {
+    "compile": "hardhat compile",
+    "deploy:local": "hardhat run deploy.js --network localhost",
+    "deploy:mumbai": "hardhat run deploy.js --network mumbai",
+    "test": "hardhat test",
+    "node": "hardhat node",
+    "clean": "hardhat clean"
+  },
+  "keywords": [
+    "nft",
+    "ticketing",
+    "blockchain",
+    "polygon",
+    "solidity"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "hardhat": "^2.19.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0",
+    "dotenv": "^16.3.1"
+  }
+}
