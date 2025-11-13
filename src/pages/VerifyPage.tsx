@@ -39,16 +39,27 @@ const VerifyPage: React.FC = () => {
       let owner: string | null = null;
 
       // Try to parse as QR code JSON first
+      let parsedInput = ticketId.trim();
+      
       try {
-        const qrData = parseTicketQR(ticketId);
-        tokenId = Number(qrData.tokenId);
-        owner = qrData.ownerAddress;
-      } catch {
-        // Otherwise treat as a token ID
-        tokenId = Number(ticketId);
-        if (Number.isNaN(tokenId)) {
-          throw new Error('Invalid token ID');
+        // If it looks like JSON, try to parse it
+        if (parsedInput.startsWith('{') && parsedInput.includes('tokenId')) {
+          const qrData = JSON.parse(parsedInput);
+          if (qrData.type === 'TICKET_NFT') {
+            tokenId = Number(qrData.tokenId);
+            owner = qrData.owner || qrData.ownerAddress;
+          } else {
+            throw new Error('Invalid QR type');
+          }
+        } else {
+          // Otherwise treat as a token ID
+          tokenId = parseInt(parsedInput);
+          if (isNaN(tokenId) || tokenId < 0) {
+            throw new Error('Invalid token ID');
+          }
         }
+      } catch (err: any) {
+        throw new Error('Invalid input. Please enter a token ID number (e.g., 6) or valid QR JSON data.');
       }
 
       // Get ticket details from blockchain
@@ -154,23 +165,20 @@ const VerifyPage: React.FC = () => {
             {/* Manual Input */}
             <div>
               <label htmlFor="ticketId" className="block text-sm font-semibold text-slate-700 mb-2">
-                Enter Token ID or QR Code
+                Enter Token ID or Paste QR Code Data
               </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  id="ticketId"
-                  value={ticketId}
-                  onChange={(e) => setTicketId(e.target.value)}
-                  placeholder="0x1a2b3c... or QR_CODE_1"
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-all duration-200"
-                />
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                  <Search className="w-5 h-5 text-slate-400" />
-                </div>
-              </div>
-              <div className="mt-2 text-xs text-slate-500">
-                Enter a token ID (e.g., "1", "2", "3") or paste QR code JSON data
+              <textarea
+                id="ticketId"
+                value={ticketId}
+                onChange={(e) => setTicketId(e.target.value)}
+                placeholder='Token ID: 1  OR  QR JSON: {"tokenId":1,"owner":"0x...","eventId":1,"eventName":"Event","timestamp":...,"type":"TICKET_NFT"}'
+                rows={3}
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-500 transition-all duration-200 font-mono"
+              />
+              <div className="mt-2 text-xs text-slate-500 space-y-1">
+                <div>✓ Enter token ID (e.g., "6", "7", "8")</div>
+                <div>✓ Or paste complete QR code JSON from a ticket</div>
+                <div>✓ Verification is done against the live blockchain</div>
               </div>
             </div>
 
@@ -233,6 +241,13 @@ const VerifyPage: React.FC = () => {
             <div className="bg-white rounded-lg p-6 mb-6 text-left">
               <h3 className="font-semibold text-slate-800 mb-4">Ticket Details</h3>
               <div className="space-y-3">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                  <div className="flex items-center space-x-2 text-blue-700 text-sm font-semibold">
+                    <CheckCircle className="w-4 h-4" />
+                    <span>✓ Verified on Blockchain</span>
+                  </div>
+                  <p className="text-xs text-blue-600 mt-1">This ticket's ownership and validity are confirmed on-chain</p>
+                </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600">Event:</span>
                   <span className="font-medium text-slate-800">
@@ -254,29 +269,29 @@ const VerifyPage: React.FC = () => {
                 <div className="flex justify-between">
                   <span className="text-slate-600">Token ID:</span>
                   <span className="font-mono text-sm text-slate-800">
-                    {verificationResult.ticketInfo.tokenId}
+                    #{verificationResult.ticketInfo.tokenId}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Owner:</span>
+                  <span className="text-slate-600">Current Owner:</span>
                   <span className="font-mono text-sm text-slate-800">
                     {formatAddress(verificationResult.ticketInfo.ownerAddress)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Valid:</span>
+                  <span className="text-slate-600">Ticket Status:</span>
                   <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                     verificationResult.ticketInfo.isTicketValid
                       ? 'bg-green-100 text-green-800'
                       : 'bg-red-100 text-red-800'
                   }`}>
-                    {verificationResult.ticketInfo.isTicketValid ? 'Yes' : 'No'}
+                    {verificationResult.ticketInfo.isTicketValid ? '✓ VALID' : '✗ INVALID'}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Price:</span>
+                  <span className="text-slate-600">Price Paid:</span>
                   <span className="font-medium text-slate-800">
-                    {verificationResult.ticketInfo.price} MATIC
+                    {verificationResult.ticketInfo.price} ETH
                   </span>
                 </div>
               </div>
@@ -294,14 +309,28 @@ const VerifyPage: React.FC = () => {
 
       {/* Instructions */}
       <div className="bg-slate-50 border border-slate-200 rounded-lg p-6">
-        <h3 className="font-semibold text-slate-800 mb-3">🔍 How to Verify</h3>
+        <h3 className="font-semibold text-slate-800 mb-3">🔍 How Blockchain Verification Works</h3>
         <ul className="text-sm text-slate-600 space-y-2">
-          <li>• Use the QR scanner to scan a ticket's QR code directly</li>
-          <li>• Alternatively, enter the Token ID manually if available</li>
-          <li>• Valid tickets will show green with full event details</li>
-          <li>• Invalid or used tickets will be clearly marked</li>
-          <li>• All verifications are recorded on the blockchain for security</li>
+          <li>• <strong>Step 1:</strong> Enter token ID (e.g., "6") or paste QR code JSON data</li>
+          <li>• <strong>Step 2:</strong> System queries the blockchain smart contract directly</li>
+          <li>• <strong>Step 3:</strong> Contract returns ticket details, current owner, and validity status</li>
+          <li>• <strong>Step 4:</strong> If QR code is used, ownership is cross-verified with QR owner data</li>
+          <li>• ✅ Green result = Valid ticket with matching owner from blockchain</li>
+          <li>• ❌ Red result = Invalid, transferred, or non-existent ticket</li>
+          <li>• 🔗 All data comes from the immutable blockchain - cannot be faked</li>
         </ul>
+      </div>
+
+      {/* Security Badge */}
+      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-6 text-center">
+        <div className="flex items-center justify-center space-x-2 text-indigo-700 font-semibold mb-2">
+          <CheckCircle className="w-5 h-5" />
+          <span>Blockchain-Verified Security</span>
+        </div>
+        <p className="text-sm text-indigo-600">
+          Every verification queries the live blockchain contract at <code className="bg-white px-2 py-1 rounded text-xs font-mono">0x5FbDB...0aa3</code>
+          <br />No fake tickets can pass this verification.
+        </p>
       </div>
     </div>
   );

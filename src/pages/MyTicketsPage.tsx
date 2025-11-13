@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, MapPin, Hash, QrCode, Send, ExternalLink } from 'lucide-react';
+import { Calendar, MapPin, Hash, QrCode, Send, ExternalLink, Download, X, CheckCircle } from 'lucide-react';
 import { useWallet } from '../context/WalletContext';
+import { ethers } from 'ethers';
 // @ts-ignore - JavaScript module without types
-import { getTicketsByOwner, getTicketDetails } from '../web3/contract';
+import { getTicketsByOwner, getTicketDetails, transferTicket } from '../web3/contract';
 // @ts-ignore - JavaScript module without types
-import { generateTicketQR } from '../utils/qrcode';
+import { generateTicketQR, downloadQRCode } from '../utils/qrcode';
 
 interface Ticket {
   tokenId: number;
@@ -20,10 +21,14 @@ interface Ticket {
 }
 
 const MyTicketsPage: React.FC = () => {
-  const { account, isConnected } = useWallet();
+  const { account, isConnected, chainId } = useWallet();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [transferModal, setTransferModal] = useState<{ open: boolean; ticket: Ticket | null }>({ open: false, ticket: null });
+  const [recipientAddress, setRecipientAddress] = useState('');
+  const [isTransferring, setIsTransferring] = useState(false);
+  const [qrModal, setQrModal] = useState<{ open: boolean; ticket: Ticket | null }>({ open: false, ticket: null });
 
   useEffect(() => {
     const loadTickets = async () => {
@@ -79,6 +84,39 @@ const MyTicketsPage: React.FC = () => {
       : 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
+  const handleTransfer = async (ticket: Ticket) => {
+    if (!recipientAddress || !ethers.isAddress(recipientAddress)) {
+      alert('Please enter a valid Ethereum address');
+      return;
+    }
+
+    setIsTransferring(true);
+    try {
+      const provider = new ethers.BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
+      
+      await transferTicket(signer, recipientAddress, ticket.tokenId);
+      
+      alert(`Successfully transferred Token #${ticket.tokenId} to ${recipientAddress}`);
+      
+      // Remove ticket from list
+      setTickets(prev => prev.filter(t => t.tokenId !== ticket.tokenId));
+      setTransferModal({ open: false, ticket: null });
+      setRecipientAddress('');
+    } catch (err: any) {
+      console.error('Transfer failed:', err);
+      alert(err?.message || 'Transfer failed');
+    } finally {
+      setIsTransferring(false);
+    }
+  };
+
+  const handleDownloadQR = (ticket: Ticket) => {
+    if (ticket.qrCode) {
+      downloadQRCode(ticket.qrCode, `ticket-${ticket.tokenId}-qr.png`);
+    }
+  };
+
   if (loading) {
     return (
       <div className="text-center py-16">
@@ -107,9 +145,9 @@ const MyTicketsPage: React.FC = () => {
         <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <QrCode className="w-8 h-8 text-slate-400" />
         </div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-2">No Tickets Yet</h2>
-        <p className="text-slate-600 mb-6">
-          You haven't purchased any tickets yet. Browse events to get your first NFT ticket.
+        <h2 className="text-2xl font-bold text-slate-800 mb-2">No Tickets Found</h2>
+        <p className="text-slate-600 mb-4">
+          {(chainId !== 1337) ? 'Wrong network. Switch MetaMask to Localhost 8545 (Chain ID 1337) then reload.' : 'You have no tickets on this local chain. Try minting a free ticket from Events.'}
         </p>
         <button className="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-indigo-600 hover:to-indigo-700 transition-all duration-200">
           Browse Events
@@ -215,6 +253,7 @@ const MyTicketsPage: React.FC = () => {
 
               <div className="flex space-x-3">
                 <button 
+                  onClick={() => setTransferModal({ open: true, ticket })}
                   className={`flex-1 flex items-center justify-center space-x-2 py-2 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
                     ticket.isValid
                       ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-200'
@@ -225,19 +264,168 @@ const MyTicketsPage: React.FC = () => {
                   <Send className="w-4 h-4" />
                   <span>Transfer</span>
                 </button>
-                <a
-                  href={`https://mumbai.polygonscan.com/token/${import.meta.env.VITE_CONTRACT_ADDRESS}?a=${ticket.tokenId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  onClick={() => setQrModal({ open: true, ticket })}
                   className="flex items-center justify-center px-4 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-all duration-200"
+                  title="View QR Code"
                 >
-                  <ExternalLink className="w-4 h-4" />
-                </a>
+                  <QrCode className="w-4 h-4" />
+                </button>
+                {chainId !== 1337 && (
+                  <a
+                    href={`https://mumbai.polygonscan.com/token/${import.meta.env.VITE_CONTRACT_ADDRESS}?a=${ticket.tokenId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center px-4 py-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-all duration-200"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
               </div>
             </div>
           </div>
         ))}
       </div>
+
+      {/* QR Code Modal */}
+      {qrModal.open && qrModal.ticket && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setQrModal({ open: false, ticket: null })}>
+          <div className="bg-white rounded-xl p-8 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-slate-800">Ticket QR Code</h3>
+              <button onClick={() => setQrModal({ open: false, ticket: null })} className="text-slate-400 hover:text-slate-600">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="text-center space-y-4">
+              <div className="bg-slate-50 p-6 rounded-lg">
+                {qrModal.ticket.qrCode && (
+                  <img src={qrModal.ticket.qrCode} alt="Ticket QR Code" className="w-full max-w-xs mx-auto border-4 border-white shadow-lg" />
+                )}
+              </div>
+              <div className="text-left space-y-2">
+                <p className="text-sm font-semibold text-slate-700">{qrModal.ticket.eventName}</p>
+                <p className="text-xs text-slate-600">Token ID: #{qrModal.ticket.tokenId}</p>
+                <p className="text-xs text-slate-600">{formatDate(qrModal.ticket.eventDate)}</p>
+                <p className="text-xs text-slate-600">Owner: {qrModal.ticket.currentOwner.slice(0, 10)}...</p>
+              </div>
+              
+              {/* QR Data for Verification */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-left">
+                <p className="text-xs font-semibold text-blue-700 mb-1">📋 Verification Code:</p>
+                <div className="bg-white rounded p-2 font-mono text-xs break-all text-slate-700 max-h-24 overflow-y-auto">
+                  {JSON.stringify({
+                    tokenId: qrModal.ticket.tokenId,
+                    owner: qrModal.ticket.currentOwner,
+                    eventId: qrModal.ticket.eventId,
+                    eventName: qrModal.ticket.eventName,
+                    timestamp: Date.now(),
+                    type: 'TICKET_NFT'
+                  })}
+                </div>
+                <button
+                  onClick={() => {
+                    const data = JSON.stringify({
+                      tokenId: qrModal.ticket!.tokenId,
+                      owner: qrModal.ticket!.currentOwner,
+                      eventId: qrModal.ticket!.eventId,
+                      eventName: qrModal.ticket!.eventName,
+                      timestamp: Date.now(),
+                      type: 'TICKET_NFT'
+                    });
+                    navigator.clipboard.writeText(data);
+                    alert('✅ Verification code copied!\nPaste it in Verify page to check authenticity.');
+                  }}
+                  className="mt-2 w-full text-xs bg-blue-100 text-blue-700 py-1.5 px-3 rounded hover:bg-blue-200 transition-colors font-semibold"
+                >
+                  📋 Copy Verification Code
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => handleDownloadQR(qrModal.ticket!)}
+                  className="flex items-center justify-center space-x-2 bg-indigo-500 text-white py-3 px-4 rounded-lg hover:bg-indigo-600 transition-all duration-200"
+                >
+                  <Download className="w-4 h-4" />
+                  <span className="text-sm">Download</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setQrModal({ open: false, ticket: null });
+                    setTimeout(() => {
+                      const verifyInput = document.getElementById('ticketId') as HTMLTextAreaElement;
+                      if (verifyInput) {
+                        verifyInput.value = qrModal.ticket!.tokenId.toString();
+                        verifyInput.focus();
+                      }
+                    }, 100);
+                  }}
+                  className="flex items-center justify-center space-x-2 bg-green-500 text-white py-3 px-4 rounded-lg hover:bg-green-600 transition-all duration-200"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  <span className="text-sm">Verify</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Modal */}
+      {transferModal.open && transferModal.ticket && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setTransferModal({ open: false, ticket: null })}>
+          <div className="bg-white rounded-xl p-8 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-slate-800">Transfer Ticket</h3>
+              <button onClick={() => setTransferModal({ open: false, ticket: null })} className="text-slate-400 hover:text-slate-600">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div className="bg-slate-50 p-4 rounded-lg">
+                <p className="text-sm font-semibold text-slate-700">{transferModal.ticket.eventName}</p>
+                <p className="text-xs text-slate-600 mt-1">Token ID: #{transferModal.ticket.tokenId}</p>
+                <p className="text-xs text-slate-600">{formatDate(transferModal.ticket.eventDate)}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Recipient Address</label>
+                <input
+                  type="text"
+                  value={recipientAddress}
+                  onChange={(e) => setRecipientAddress(e.target.value)}
+                  placeholder="0x..."
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-sm"
+                />
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <p className="text-xs text-amber-800">⚠️ This action cannot be undone. Make sure the recipient address is correct.</p>
+              </div>
+              <button
+                onClick={() => handleTransfer(transferModal.ticket!)}
+                disabled={isTransferring || !recipientAddress}
+                className={`w-full py-3 px-6 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center space-x-2 ${
+                  isTransferring || !recipientAddress
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    : 'bg-indigo-500 text-white hover:bg-indigo-600'
+                }`}
+              >
+                {isTransferring ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Transferring...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-5 h-5" />
+                    <span>Transfer Ticket</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

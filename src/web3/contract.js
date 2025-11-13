@@ -1,9 +1,10 @@
 import { ethers } from 'ethers';
 import contractABI from './contractABI.json';
+import deployment from './deployment.json';
 
 // Contract configuration
-const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || '';
-const MUMBAI_RPC_URL = import.meta.env.VITE_MUMBAI_RPC_URL || 'https://polygon-mumbai-bor-rpc.publicnode.com';
+const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || (deployment?.address ?? '');
+const LOCAL_RPC_URL = import.meta.env.VITE_LOCAL_RPC_URL || 'http://127.0.0.1:8545';
 
 // Get contract instance with signer
 export const getContract = async (signer) => {
@@ -32,10 +33,18 @@ export const getContractReadOnly = async () => {
     throw new Error('Contract address not configured');
   }
 
-  const provider = new ethers.JsonRpcProvider(MUMBAI_RPC_URL);
+  let provider;
+  if (typeof window !== 'undefined' && window.ethereum) {
+    // Use the browser provider so it respects the user's selected network (we auto-switch to 1337 elsewhere)
+    provider = new ethers.BrowserProvider(window.ethereum);
+  } else {
+    // Fallback for SSR/tests or when MetaMask not available
+    provider = new ethers.JsonRpcProvider(LOCAL_RPC_URL);
+  }
+
   const code = await provider.getCode(CONTRACT_ADDRESS);
   if (!code || code === '0x') {
-    throw new Error('Contract not found at configured address on the connected RPC. Check .env VITE_CONTRACT_ADDRESS and redeploy to localhost if needed.');
+    throw new Error('Contract not found on the current network. Switch MetaMask to Localhost 8545 (chainId 1337) and ensure the contract is deployed.');
   }
   return new ethers.Contract(CONTRACT_ADDRESS, contractABI, provider);
 };
@@ -212,7 +221,7 @@ export const getEventTickets = async (eventId) => {
  */
 export const getEventTicketCount = async (eventId) => {
   try {
-    const contract = getContractReadOnly();
+    const contract = await getContractReadOnly();
     
     const count = await contract.getEventTicketCount(eventId);
     
@@ -228,7 +237,7 @@ export const getEventTicketCount = async (eventId) => {
  */
 export const getCurrentTokenId = async () => {
   try {
-    const contract = getContractReadOnly();
+    const contract = await getContractReadOnly();
     
     const tokenId = await contract.getCurrentTokenId();
     

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Header from './components/Header';
 import MetaMaskPrompt from './components/MetaMaskPrompt';
 import EventsPage from './pages/EventsPage';
@@ -9,9 +10,6 @@ import VerifyPage from './pages/VerifyPage';
 export type Page = 'events' | 'my-tickets' | 'transfer' | 'verify';
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<Page>('events');
-  const [showMetaMaskPrompt, setShowMetaMaskPrompt] = useState(false);
-
   useEffect(() => {
     // Check if MetaMask is installed
     const checkMetaMask = () => {
@@ -30,37 +28,28 @@ function App() {
     };
   }, []);
 
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'events':
-        return <EventsPage />;
-      case 'my-tickets':
-        return <MyTicketsPage />;
-      case 'transfer':
-        return <TransferPage />;
-      case 'verify':
-        return <VerifyPage />;
-      default:
-        return <EventsPage />;
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <Header
-        currentPage={currentPage}
-        setCurrentPage={setCurrentPage}
-      />
-      
-      <main className="container mx-auto px-4 py-8">
-        {renderPage()}
-      </main>
+    <Router>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <Header />
+        
+        <main className="container mx-auto px-4 py-8">
+          <Routes>
+            <Route path="/" element={<Navigate to="/events" replace />} />
+            <Route path="/events" element={<EventsPage />} />
+            <Route path="/my-tickets" element={<MyTicketsPage />} />
+            <Route path="/transfer" element={<TransferPage />} />
+            <Route path="/verify" element={<VerifyPage />} />
+            <Route path="*" element={<Navigate to="/events" replace />} />
+          </Routes>
+        </main>
 
-      <MetaMaskPrompt 
-        show={showMetaMaskPrompt} 
-        onClose={() => setShowMetaMaskPrompt(false)} 
-      />
-    </div>
+        <MetaMaskPrompt 
+          show={false} 
+          onClose={() => {}} 
+        />
+      </div>
+    </Router>
   );
 }
 

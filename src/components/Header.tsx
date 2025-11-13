@@ -1,23 +1,17 @@
 import React from 'react';
 import { Wallet, Calendar, Ticket, QrCode, ArrowLeftRight, ChevronDown } from 'lucide-react';
 import { useWallet } from '../context/WalletContext';
-import type { Page } from '../App';
+import { Link, useLocation } from 'react-router-dom';
 
-interface HeaderProps {
-  currentPage: Page;
-  setCurrentPage: (page: Page) => void;
-}
-
-const Header: React.FC<HeaderProps> = ({
-  currentPage,
-  setCurrentPage,
-}) => {
+const Header: React.FC = () => {
   const { account, balance, isConnected, isLoading, error, connect, disconnect } = useWallet();
+  const location = useLocation();
+  
   const navigationItems = [
-    { id: 'events' as Page, label: 'Events', icon: Calendar },
-    { id: 'my-tickets' as Page, label: 'My Tickets', icon: Ticket },
-    { id: 'transfer' as Page, label: 'Transfer', icon: ArrowLeftRight },
-    { id: 'verify' as Page, label: 'Verify', icon: QrCode },
+    { path: '/events', label: 'Events', icon: Calendar },
+    { path: '/my-tickets', label: 'My Tickets', icon: Ticket },
+    { path: '/transfer', label: 'Transfer', icon: ArrowLeftRight },
+    { path: '/verify', label: 'Verify', icon: QrCode },
   ];
 
   const formatAddress = (address: string) => {
@@ -35,7 +29,15 @@ const Header: React.FC<HeaderProps> = ({
             </div>
             <div>
               <h1 className="text-xl font-bold text-slate-800">TicketNFT</h1>
-              <p className="text-xs text-slate-500">Polygon Mumbai</p>
+              <p className="text-xs text-slate-500">{(() => {
+                if (!isConnected) return 'Not connected';
+                // Prefer localhost display
+                // 1337 is Hardhat's default chainId
+                // 31337 is also common (foundry/anvil) — show generic label
+                if ((window as any)?.ethereum && (window as any).ethereum.chainId === '0x539') return 'Localhost 8545';
+                if ((window as any)?.ethereum && (window as any).ethereum.chainId === '0x7a69') return 'Localhost (31337)';
+                return 'Connected';
+              })()}</p>
             </div>
           </div>
 
@@ -43,19 +45,20 @@ const Header: React.FC<HeaderProps> = ({
           <nav className="hidden md:flex items-center space-x-1">
             {navigationItems.map((item) => {
               const Icon = item.icon;
+              const isActive = location.pathname === item.path;
               return (
-                <button
-                  key={item.id}
-                  onClick={() => setCurrentPage(item.id)}
+                <Link
+                  key={item.path}
+                  to={item.path}
                   className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                    currentPage === item.id
+                    isActive
                       ? 'bg-indigo-50 text-indigo-600 shadow-sm'
                       : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-50'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
                   <span>{item.label}</span>
-                </button>
+                </Link>
               );
             })}
           </nav>
@@ -63,12 +66,12 @@ const Header: React.FC<HeaderProps> = ({
           {/* Mobile Navigation */}
           <div className="md:hidden">
             <select
-              value={currentPage}
-              onChange={(e) => setCurrentPage(e.target.value as Page)}
+              value={location.pathname}
+              onChange={(e) => window.location.href = e.target.value}
               className="bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               {navigationItems.map((item) => (
-                <option key={item.id} value={item.id}>
+                <option key={item.path} value={item.path}>
                   {item.label}
                 </option>
               ))}
