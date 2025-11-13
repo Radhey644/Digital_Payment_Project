@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, MapPin, Hash, QrCode, Send, ExternalLink, Download, X, CheckCircle } from 'lucide-react';
+import { Calendar, MapPin, Hash, QrCode, Send, Download, X, CheckCircle } from 'lucide-react';
 import { useWallet } from '../context/WalletContext';
 import { ethers } from 'ethers';
 // @ts-ignore - JavaScript module without types
@@ -24,7 +24,7 @@ const MyTicketsPage: React.FC = () => {
   const { account, isConnected, chainId } = useWallet();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
   const [transferModal, setTransferModal] = useState<{ open: boolean; ticket: Ticket | null }>({ open: false, ticket: null });
   const [recipientAddress, setRecipientAddress] = useState('');
   const [isTransferring, setIsTransferring] = useState(false);

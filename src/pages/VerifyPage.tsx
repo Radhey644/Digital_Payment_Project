@@ -21,7 +21,6 @@ interface VerificationResult {
 
 const VerifyPage: React.FC = () => {
   const [ticketId, setTicketId] = useState('');
-  const [ownerAddress, setOwnerAddress] = useState('');
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
 
