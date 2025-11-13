@@ -271,7 +271,7 @@ const MyTicketsPage: React.FC = () => {
                 >
                   <QrCode className="w-4 h-4" />
                 </button>
-                {chainId !== 1337 && (
+                {/* {chainId !== 1337 && (
                   <a
                     href={`https://mumbai.polygonscan.com/token/${import.meta.env.VITE_CONTRACT_ADDRESS}?a=${ticket.tokenId}`}
                     target="_blank"
@@ -280,7 +280,7 @@ const MyTicketsPage: React.FC = () => {
                   >
                     <ExternalLink className="w-4 h-4" />
                   </a>
-                )}
+                )} */}
               </div>
             </div>
           </div>
